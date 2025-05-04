@@ -6,10 +6,11 @@ readme = "README.md"
 authors = [
     { name = "Sandip Khaire", email = "sandipkhaire007@gmail.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "feature-engine>=1.8.3",
     "numpy>=2.2.5",
+    "optbinning==0.20.1",
     "pandas>=2.2.3",
     "scikit-learn>=1.6.1",
     "seaborn>=0.13.2",

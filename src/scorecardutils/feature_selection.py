@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from collections import defaultdict
 from typing import Dict, List, Set
+from concurrent.futures import ThreadPoolExecutor
 
 
 def shap_feature_selection(
@@ -368,3 +369,111 @@ def select_best_features_from_corr_groups(correlated_groups, feature_importance_
     selected_features = result_df.loc[result_df['keep'], 'feature'].tolist()
     
     return result_df, selected_features
+
+
+
+def jeffrey(p_1, p_2, return_sum=True):
+    """Calculate Jeffrey divergence between two distributions, multiplied by 100 and rounded to 2 decimal places."""
+    # Handle zeros to avoid division by zero
+    p_1_safe = np.maximum(p_1, 1e-10)
+    p_2_safe = np.maximum(p_2, 1e-10)
+    
+    # Calculate Jeffrey divergence and multiply by 100
+    divergence = ((p_1_safe - p_2_safe) * np.log(p_1_safe / p_2_safe)) * 100
+    
+    # Round to 2 decimal places
+    divergence = np.round(divergence, 2)
+    
+    # Return sum if requested, otherwise return the array
+    return np.sum(divergence) if return_sum else divergence
+
+
+def process_variable(name, X_oot, X_train, binning_process, psi_min_bin_size=0.01):
+    """Process a single variable to calculate VSI metrics."""
+    # Get the binned variable object
+    optb = binning_process.get_binned_variable(name)
+    sc_table = optb.binning_table.build()
+    
+    # Transform data to bins
+    ta = optb.transform(X_oot[name], metric="bins")
+    te = optb.transform(X_train[name], metric="bins")
+    
+    # Get unique bins
+    unique_bins = sc_table["Bin"].iloc[:-1].values
+    n_bins = len(unique_bins)
+    
+    # Vectorized counts
+    bin_counts_a = np.array([np.sum(ta == str(bin_val)) for bin_val in unique_bins[:n_bins]])
+    bin_counts_e = np.array([np.sum(te == str(bin_val)) for bin_val in unique_bins[:n_bins]])
+    
+    # Calculate proportions
+    t_records_a = bin_counts_a.sum()
+    t_records_e = bin_counts_e.sum()
+    prop_a = np.round(bin_counts_a / t_records_a,2)
+    prop_e = np.round(bin_counts_e / t_records_e,2)
+    
+    # Calculate PSI
+    psi = jeffrey(prop_a, prop_e, return_sum=False)
+    
+    # Create result dataframe
+    df_psi = pd.DataFrame({
+        "Variable": [name] * n_bins,
+        "Bin": unique_bins[:n_bins],
+        "Count OOT": bin_counts_a,
+        "Count Train": bin_counts_e,
+        "Count OOT (%)": prop_a,
+        "Count Train (%)": prop_e,
+        "CSI": psi
+    })
+    
+    return df_psi
+
+
+def vsi_check(X_oot, X_train, binning_process, style='summary', psi_min_bin_size=0.01, max_workers=None):
+    """
+    Calculate Variable Stability Index (VSI) by comparing OOT and training data distributions.
+    
+    Parameters:
+    -----------
+    X_oot : pandas.DataFrame
+        Out-of-time data for comparison
+    X_train : pandas.DataFrame
+        Training data as baseline
+    binning_process : object
+        Binning process object with required methods for transformation
+    style : str, default 'summary'
+        Output style - 'summary' for variable-level CSI sums or 'detailed' for bin-level details
+    psi_min_bin_size : float, default 0.01
+        Minimum bin size threshold for inclusion in CSI calculations
+    max_workers : int, optional
+        Maximum number of worker threads for parallel processing
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame containing CSI values either at variable level (summary) or bin level (detailed)
+    """
+    # Get variables with support
+    variables = binning_process.get_support(names=True)
+    
+    # Process variables in parallel
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(
+            lambda var: process_variable(var, X_oot, X_train, binning_process, psi_min_bin_size),
+            variables
+        ))
+    
+    # Combine results
+    df_psi_variable = pd.concat(results, ignore_index=True)
+    
+    # Return results based on requested style
+    if style == "summary":
+        summary_df = (df_psi_variable[df_psi_variable["Count Train (%)"] >= psi_min_bin_size]
+                     .groupby(['Variable'])['CSI']
+                     .sum()
+                     .reset_index())
+        # Ensure the summed CSI values are also rounded to 2 decimal places
+        summary_df['CSI'] = summary_df['CSI'].round(2)
+        return summary_df
+    else:  # style == "detailed"
+        return df_psi_variable
