@@ -14,7 +14,7 @@ def enhanced_bivariate_plot(
     filename: str = 'bivariate',
     metric: str = 'event_rate',
     variables: Optional[List[str]] = None,
-    figsize: tuple = (12, 6),  # Reduced figure size for better viewing
+    figsize: tuple = (12, 6),
     dpi: int = 100,
     style: str = 'whitegrid'
 ) -> None:
@@ -32,9 +32,9 @@ def enhanced_bivariate_plot(
         Metric to plot. Options: 'event_rate', 'woe'
     variables : list of str, optional
         List of specific variable names to process. If None, all variables are processed.
-    figsize : tuple, default=(14, 8)
+    figsize : tuple, default=(12, 6)
         Figure size for plots in inches (width, height)
-    dpi : int, default=300
+    dpi : int, default=100
         Resolution of saved images
     style : str, default='whitegrid'
         Seaborn style for plots
@@ -50,7 +50,7 @@ def enhanced_bivariate_plot(
         raise ValueError("metric must be either 'event_rate' or 'woe'")
     
     # Get all available variables from binning process
-    all_variables = binning_process.get_support(names=True)
+    all_variables = binning_process.variable_names
     
     # Filter variables if specified
     if variables is not None:
@@ -63,12 +63,8 @@ def enhanced_bivariate_plot(
         selected_vars = all_variables
     
     # Set up the visualization style
-    #sns.set_style(style)
     plt.style.use('default')  # Clean matplotlib style
 
-    
-    
-    
     # Create a temporary directory for images if it doesn't exist
     if not os.path.exists('temp_plots'):
         os.makedirs('temp_plots')
@@ -84,12 +80,19 @@ def enhanced_bivariate_plot(
     with pd.ExcelWriter(f'{filename}.xlsx', engine='openpyxl', mode='w') as writer:
         # Process each selected variable
         for var in selected_vars:
+            # Sanitize variable name for Excel sheet name (remove invalid characters)
+            # Excel sheet names cannot contain: [ ] : * ? / \
+            sheet_name = str(var)
+            for char in ['[', ']', ':', '*', '?', '/', '\\']:
+                sheet_name = sheet_name.replace(char, '_')
+            # Ensure sheet name is not longer than 31 characters (Excel limit)
+            if len(sheet_name) > 31:
+                sheet_name = sheet_name[:31]
             # Get the binned variable
             optb = binning_process.get_binned_variable(var)
             
             # Get DataFrame from binning table and clean it up
             df = optb.binning_table.build()
-            #df["Event rate"] = (df["Event rate"] * 100).round(1)
             if 'JS' in df.columns:
                 df = df.drop(columns='JS')
             
@@ -109,7 +112,7 @@ def enhanced_bivariate_plot(
             bin_col_name = 'Bin' if 'Bin' in df.columns else df.columns[0]
             
             # Write original DataFrame (including Totals) to Excel
-            df_for_excel.to_excel(writer, sheet_name=var, index=False)
+            df_for_excel.to_excel(writer, sheet_name=sheet_name, index=False)
             
             # Create custom plot using Seaborn and Matplotlib
             plot_image_path = f'temp_plots/variable_{var}_{metric}.png'
@@ -117,11 +120,13 @@ def enhanced_bivariate_plot(
             # Create figure with proper size to avoid cropping
             fig, ax1 = plt.subplots(figsize=figsize)
             
-            # Identify regular, special, and missing bins
-            # Explicitly check for strings 'Special' and 'Missing' in the bins column
-            regular_bins = df[(df[bin_col_name] != 'Special') & (df[bin_col_name] != 'Missing')]
-            special_bin = df[df[bin_col_name] == 'Special'] if 'Special' in df[bin_col_name].values else pd.DataFrame()
-            missing_bin = df[df[bin_col_name] == 'Missing'] if 'Missing' in df[bin_col_name].values else pd.DataFrame()
+            # Fix: Convert bin column to string to safely compare with string values
+            df[bin_col_name] = df[bin_col_name].astype(str)
+            
+            # Identify regular, special, and missing bins - safely using string comparisons
+            regular_bins = df[~df[bin_col_name].str.contains('Special|Missing', regex=True, na=False)]
+            special_bin = df[df[bin_col_name].str.contains('Special', regex=False, na=False)]
+            missing_bin = df[df[bin_col_name].str.contains('Missing', regex=False, na=False)]
             
             # Create indices for x-axis
             x_indices = np.arange(len(df))
@@ -130,7 +135,7 @@ def enhanced_bivariate_plot(
             bin_labels = []
             for _, row in df.iterrows():
                 bin_name = row[bin_col_name]
-                if bin_name in ['Special', 'Missing']:
+                if 'Special' in bin_name or 'Missing' in bin_name:
                     bin_labels.append(bin_name)
                 else:
                     # Use the actual bin values but truncate if too long
@@ -154,7 +159,7 @@ def enhanced_bivariate_plot(
             # Plot the metric line for regular bins only (connecting them)
             if not regular_bins.empty:
                 # Get indices of regular bins in the full dataframe
-                regular_mask = df[bin_col_name].apply(lambda x: x not in ['Special', 'Missing'])
+                regular_mask = ~df[bin_col_name].str.contains('Special|Missing', regex=True, na=False)
                 regular_indices = np.where(regular_mask)[0]
                 
                 if len(regular_indices) > 0:
@@ -173,31 +178,33 @@ def enhanced_bivariate_plot(
             
             # Plot Special bin point (if exists) without connecting
             if not special_bin.empty:
-                special_idx = df[df[bin_col_name] == 'Special'].index[0]
-                special_val = special_bin[metric_column].values[0]
-                ax2.plot(special_idx, special_val,
-                         marker='s', color='red', markersize=8, linestyle='None', label='Special')
-                # Reduce decimal places and font size for special bin annotation
-                ax2.annotate(f'{special_val:.3f}', 
-                             xy=(special_idx, special_val), 
-                             xytext=(0, 5),
-                             textcoords='offset points',
-                             ha='center', 
-                             fontsize=7)
+                special_indices = df[df[bin_col_name].str.contains('Special', regex=False, na=False)].index
+                for idx in special_indices:
+                    special_val = df.loc[idx, metric_column]
+                    ax2.plot(idx, special_val,
+                             marker='s', color='red', markersize=8, linestyle='None', label='Special' if idx == special_indices[0] else "")
+                    # Reduce decimal places and font size for special bin annotation
+                    ax2.annotate(f'{special_val:.3f}', 
+                                 xy=(idx, special_val), 
+                                 xytext=(0, 5),
+                                 textcoords='offset points',
+                                 ha='center', 
+                                 fontsize=7)
             
             # Plot Missing bin point (if exists) without connecting
             if not missing_bin.empty:
-                missing_idx = df[df[bin_col_name] == 'Missing'].index[0]
-                missing_val = missing_bin[metric_column].values[0]
-                ax2.plot(missing_idx, missing_val,
-                         marker='D', color='purple', markersize=8, linestyle='None', label='Missing')
-                # Reduce decimal places and font size for missing bin annotation
-                ax2.annotate(f'{missing_val:.3f}', 
-                             xy=(missing_idx, missing_val), 
-                             xytext=(0, 5),
-                             textcoords='offset points',
-                             ha='center', 
-                             fontsize=7)
+                missing_indices = df[df[bin_col_name].str.contains('Missing', regex=False, na=False)].index
+                for idx in missing_indices:
+                    missing_val = df.loc[idx, metric_column]
+                    ax2.plot(idx, missing_val,
+                             marker='D', color='purple', markersize=8, linestyle='None', label='Missing' if idx == missing_indices[0] else "")
+                    # Reduce decimal places and font size for missing bin annotation
+                    ax2.annotate(f'{missing_val:.3f}', 
+                                 xy=(idx, missing_val), 
+                                 xytext=(0, 5),
+                                 textcoords='offset points',
+                                 ha='center', 
+                                 fontsize=7)
             
             # Add horizontal line for Totals if available
             if totals_row is not None:
@@ -224,11 +231,10 @@ def enhanced_bivariate_plot(
             plt.title(f'{var}: {y_axis_label} by Bin', fontsize=12)
             
             # Add legend with small font size and optimize position
-            lines, labels = ax2.get_legend_handles_labels()
-            ax2.legend(lines, labels, loc='best', fontsize=9)
-            
-            # Add grid for better visualization
-            #ax1.grid(axis='y', linestyle='--', alpha=0.5)
+            handles, labels = ax2.get_legend_handles_labels()
+            # Remove duplicate labels in legend
+            by_label = dict(zip(labels, handles))
+            ax2.legend(by_label.values(), by_label.keys(), loc='best', fontsize=9)
             
             # Adjust layout to prevent cropping
             plt.tight_layout()
@@ -248,12 +254,12 @@ def enhanced_bivariate_plot(
             row_position = len(df_for_excel) + 4  # +4 for margin
             img.anchor = f'A{row_position}'
             
-            writer.sheets[var].add_image(img)
+            writer.sheets[sheet_name].add_image(img)
             
             # Adjust column widths for better readability
             for idx, col in enumerate(df_for_excel.columns):
                 column_width = max(len(str(col)), df_for_excel[col].astype(str).map(len).max())
-                writer.sheets[var].column_dimensions[chr(65 + idx)].width = column_width + 2
+                writer.sheets[sheet_name].column_dimensions[chr(65 + idx)].width = column_width + 2
     
     # Clean up temporary image files
     for path in plot_paths.values():
@@ -265,22 +271,6 @@ def enhanced_bivariate_plot(
         os.rmdir('temp_plots')
     
     print(f"Enhanced bivariate analysis completed! Results saved to {filename}.xlsx")
-
-
-# Example usage with different metrics and variable selections
-# 1. Process all variables with event rate
-# enhanced_bivariate_plot(binning_process, filename='bivariate_event_rate', metric='event_rate')
-
-# 2. Process all variables with WoE
-# enhanced_bivariate_plot(binning_process, filename='bivariate_woe', metric='woe')
-
-# 3. Process only specific variables
-# enhanced_bivariate_plot(
-#     binning_process, 
-#     filename='selected_variables', 
-#     metric='event_rate',
-#     variables=['age', 'income', 'credit_score']
-# )
 
 
 def transform_and_plot_oot_bivariate_data(
@@ -333,7 +323,11 @@ def transform_and_plot_oot_bivariate_data(
         raise ValueError("metric must be either 'event_rate' or 'woe'")
     
     # Get all available variables from binning process
-    all_variables = binning_process.get_support(names=True)
+    try:
+        # Fall back to variable_names if get_support is not available
+        all_variables = binning_process.variable_names        
+    except AttributeError:
+        all_variables = binning_process.get_support(names=True)
     
     # Filter variables if specified
     if variables is not None:
@@ -364,8 +358,21 @@ def transform_and_plot_oot_bivariate_data(
     with pd.ExcelWriter(f'{filename}.xlsx', engine='openpyxl', mode='w') as writer:
         # Process each selected variable
         for var in selected_vars:
+            # Sanitize variable name for Excel sheet name (remove invalid characters)
+            # Excel sheet names cannot contain: [ ] : * ? / \
+            sheet_name = str(var)
+            for char in ['[', ']', ':', '*', '?', '/', '\\']:
+                sheet_name = sheet_name.replace(char, '_')
+            # Ensure sheet name is not longer than 31 characters (Excel limit)
+            if len(sheet_name) > 31:
+                sheet_name = sheet_name[:31]
+                
             # Get the binned variable from the trained process
-            optb = binning_process.get_binned_variable(var)
+            try:
+                optb = binning_process.get_binned_variable(var)
+            except Exception as e:
+                print(f"Error getting binned variable {var}: {str(e)}")
+                continue
             
             # Get original binning table from training data
             train_df = optb.binning_table.build()
@@ -374,11 +381,19 @@ def transform_and_plot_oot_bivariate_data(
             
             # Transform the OOT data for this variable using the trained binning
             # First, extract the feature vector for this variable
-            X_var = oot_data[var].values
-            y_oot = oot_data[target_column].values
+            try:
+                X_var = oot_data[var].values
+                y_oot = oot_data[target_column].values
+            except KeyError as e:
+                print(f"Variable {var} or target column {target_column} not found in OOT data: {str(e)}")
+                continue
             
             # Use the transform method with "bins" metric to get bin assignments
-            oot_bins = optb.transform(X_var, metric="bins")
+            try:
+                oot_bins = optb.transform(X_var, metric="bins")
+            except Exception as e:
+                print(f"Error transforming OOT data for variable {var}: {str(e)}")
+                continue
             
             # Create a mapping of bin labels to indices
             train_df_reset = train_df.reset_index() if 'Totals' not in train_df.index else train_df.drop('Totals').reset_index()
@@ -452,7 +467,7 @@ def transform_and_plot_oot_bivariate_data(
             binning_tables[var] = oot_df_with_totals
             
             # Write transformed DataFrame to Excel - make sure at least one sheet is created
-            oot_df_with_totals.to_excel(writer, sheet_name=var, index=False)
+            oot_df_with_totals.to_excel(writer, sheet_name=sheet_name, index=False)
             
             # Create custom plot with comparison
             plot_image_path = f'temp_plots/variable_{var}_{metric}_oot.png'
@@ -460,10 +475,13 @@ def transform_and_plot_oot_bivariate_data(
             # Create figure with proper size
             fig, ax1 = plt.subplots(figsize=figsize)
             
-            # Identify regular, special, and missing bins in OOT data
-            regular_bins = oot_df[(oot_df[bin_col_name] != 'Special') & (oot_df[bin_col_name] != 'Missing')]
-            special_bin = oot_df[oot_df[bin_col_name] == 'Special'] if 'Special' in oot_df[bin_col_name].values else pd.DataFrame()
-            missing_bin = oot_df[oot_df[bin_col_name] == 'Missing'] if 'Missing' in oot_df[bin_col_name].values else pd.DataFrame()
+            # Fix: Convert bin column to string to safely compare with string values
+            oot_df[bin_col_name] = oot_df[bin_col_name].astype(str)
+            
+            # Identify regular, special, and missing bins - safely using string comparisons
+            regular_bins = oot_df[~oot_df[bin_col_name].str.contains('Special|Missing', regex=True, na=False)]
+            special_bin = oot_df[oot_df[bin_col_name].str.contains('Special', regex=False, na=False)]
+            missing_bin = oot_df[oot_df[bin_col_name].str.contains('Missing', regex=False, na=False)]
             
             # Create indices for x-axis
             x_indices = np.arange(len(oot_df))
@@ -472,7 +490,7 @@ def transform_and_plot_oot_bivariate_data(
             bin_labels = []
             for _, row in oot_df.iterrows():
                 bin_name = row[bin_col_name]
-                if bin_name in ['Special', 'Missing']:
+                if 'Special' in bin_name or 'Missing' in bin_name:
                     bin_labels.append(bin_name)
                 else:
                     # Use the actual bin values but truncate if too long
@@ -489,6 +507,9 @@ def transform_and_plot_oot_bivariate_data(
                 # Get training data percentages
                 train_df_no_totals = train_df.drop('Totals') if 'Totals' in train_df.index else train_df
                 train_df_reset = train_df_no_totals.reset_index()
+                
+                # Ensure bin column in train_df_reset is string for consistent comparison
+                train_df_reset[bin_col_name] = train_df_reset[bin_col_name].astype(str)
                 
                 # Initialize array for train percentages
                 train_percentages = np.zeros(len(oot_df))
@@ -536,17 +557,18 @@ def transform_and_plot_oot_bivariate_data(
             
             # Create second y-axis for Event Rate or WoE
             ax2 = ax1.twinx()
+            line_color = 'darkgoldenrod'
             
             # Plot the metric line for regular bins only in OOT data
             if not regular_bins.empty:
                 # Get indices of regular bins in the full dataframe
-                regular_mask = oot_df[bin_col_name].apply(lambda x: x not in ['Special', 'Missing'])
+                regular_mask = ~oot_df[bin_col_name].str.contains('Special|Missing', regex=True, na=False)
                 regular_indices = np.where(regular_mask)[0]
                 
                 if len(regular_indices) > 0:
                     # Plot connected line for regular bins
                     ax2.plot(regular_indices, regular_bins[metric_column], 
-                             marker='o', color='darkgoldenrod', linewidth=2, 
+                             marker='o', color=line_color, linewidth=2, 
                              label=f'OOT {y_axis_label}')
                     
                     # Add value annotations for OOT data
@@ -564,6 +586,9 @@ def transform_and_plot_oot_bivariate_data(
                 train_df_no_totals = train_df.drop('Totals') if 'Totals' in train_df.index else train_df
                 train_df_reset = train_df_no_totals.reset_index()
                 
+                # Ensure bin column in train_df_reset is string for consistent comparison
+                train_df_reset[bin_col_name] = train_df_reset[bin_col_name].astype(str)
+                
                 # Prepare train metric values for regular bins only
                 if not regular_bins.empty:
                     # Initialize arrays for train metric values
@@ -572,7 +597,7 @@ def transform_and_plot_oot_bivariate_data(
                     
                     # Collect train metric values for regular bins
                     for idx, bin_val in enumerate(oot_df[bin_col_name]):
-                        if bin_val not in ['Special', 'Missing']:
+                        if not any(substring in bin_val for substring in ['Special', 'Missing']):
                             # Find matching bin in training data
                             train_match = train_df_reset[train_df_reset[bin_col_name] == bin_val]
                             if not train_match.empty:
@@ -596,36 +621,40 @@ def transform_and_plot_oot_bivariate_data(
             
             # Plot Special bin point (if exists) without connecting for OOT data
             if not special_bin.empty:
-                special_idx = oot_df[oot_df[bin_col_name] == 'Special'].index[0]
-                special_val = special_bin[metric_column].values[0]
-                ax2.plot(special_idx, special_val,
-                         marker='s', color='red', markersize=8, linestyle='None', label='Special (OOT)')
-                # Annotate special bin
-                ax2.annotate(f'{special_val:.3f}', 
-                             xy=(special_idx, special_val), 
-                             xytext=(0, 5),
-                             textcoords='offset points',
-                             ha='center', 
-                             fontsize=7)
+                special_indices = oot_df[oot_df[bin_col_name].str.contains('Special', regex=False, na=False)].index
+                for idx in special_indices:
+                    special_val = oot_df.loc[idx, metric_column]
+                    ax2.plot(idx, special_val,
+                            marker='s', color='red', markersize=8, linestyle='None', 
+                            label='Special (OOT)' if idx == special_indices[0] else "")
+                    # Annotate special bin
+                    ax2.annotate(f'{special_val:.3f}', 
+                                xy=(idx, special_val), 
+                                xytext=(0, 5),
+                                textcoords='offset points',
+                                ha='center', 
+                                fontsize=7)
             
             # Plot Missing bin point (if exists) without connecting for OOT data
             if not missing_bin.empty:
-                missing_idx = oot_df[oot_df[bin_col_name] == 'Missing'].index[0]
-                missing_val = missing_bin[metric_column].values[0]
-                ax2.plot(missing_idx, missing_val,
-                         marker='D', color='purple', markersize=8, linestyle='None', label='Missing (OOT)')
-                # Annotate missing bin
-                ax2.annotate(f'{missing_val:.3f}', 
-                             xy=(missing_idx, missing_val), 
-                             xytext=(0, 5),
-                             textcoords='offset points',
-                             ha='center', 
-                             fontsize=7)
+                missing_indices = oot_df[oot_df[bin_col_name].str.contains('Missing', regex=False, na=False)].index
+                for idx in missing_indices:
+                    missing_val = oot_df.loc[idx, metric_column]
+                    ax2.plot(idx, missing_val,
+                            marker='D', color='purple', markersize=8, linestyle='None', 
+                            label='Missing (OOT)' if idx == missing_indices[0] else "")
+                    # Annotate missing bin
+                    ax2.annotate(f'{missing_val:.3f}', 
+                                xy=(idx, missing_val), 
+                                xytext=(0, 5),
+                                textcoords='offset points',
+                                ha='center', 
+                                fontsize=7)
             
             # Add horizontal lines for Totals
             if metric == 'event_rate':
                 # OOT data total event rate
-                ax2.axhline(y=total_event_rate, color='darkgoldenrod', linestyle='--', 
+                ax2.axhline(y=total_event_rate, color=line_color, linestyle='--', 
                           alpha=0.7, label=f'OOT Total: {total_event_rate:.4f}')
                 
                 # Training data total event rate
@@ -645,20 +674,27 @@ def transform_and_plot_oot_bivariate_data(
                               alpha=0.7, label=f'Train Total: {train_total_val:.4f}')
             else:  # WoE metric
                 # For WoE, add a horizontal line at 0 for reference
-                ax2.axhline(y=0, color='darkgoldenrod', linestyle='--', 
+                ax2.axhline(y=0, color=line_color, linestyle='--', 
                           alpha=0.7, label='WoE = 0 (Reference)')
             
             # Set y-axis label and title
-            ax2.set_ylabel(y_axis_label, color='darkgoldenrod', fontsize=11)
-            ax2.tick_params(axis='y', labelcolor='darkgoldenrod')
+            ax2.set_ylabel(y_axis_label, color=line_color, fontsize=11)
+            ax2.tick_params(axis='y', labelcolor=line_color)
             
             # Set title with variable name
             plt.title(f'{var}: {y_axis_label} Comparison', fontsize=12)
             
-            # Add legends for both axes
-            h1, l1 = ax1.get_legend_handles_labels()
-            h2, l2 = ax2.get_legend_handles_labels()
-            ax1.legend(h1+h2, l1+l2, loc='best', fontsize=8)
+            # Add legend with small font size and optimize position
+            handles, labels = [], []
+            for handle, label in zip(*ax1.get_legend_handles_labels()):
+                if label not in labels:
+                    handles.append(handle)
+                    labels.append(label)
+            for handle, label in zip(*ax2.get_legend_handles_labels()):
+                if label not in labels:
+                    handles.append(handle)
+                    labels.append(label)
+            ax1.legend(handles, labels, loc='best', fontsize=8)
             
             # Adjust layout to prevent cropping
             plt.tight_layout()
@@ -671,19 +707,22 @@ def transform_and_plot_oot_bivariate_data(
             plot_paths[var] = plot_image_path
             
             # Insert plot image into the Excel sheet
-            img = Image(plot_image_path)
-            
-            # Calculate position based on data size (including Totals row)
-            # Start plot after the data table with some margin
-            row_position = len(oot_df_with_totals) + 4  # +4 for margin
-            img.anchor = f'A{row_position}'
-            
-            writer.sheets[var].add_image(img)
-            
-            # Adjust column widths for better readability
-            for idx, col in enumerate(oot_df_with_totals.columns):
-                column_width = max(len(str(col)), oot_df_with_totals[col].astype(str).map(len).max())
-                writer.sheets[var].column_dimensions[chr(65 + idx)].width = column_width + 2
+            try:
+                img = Image(plot_image_path)
+                
+                # Calculate position based on data size (including Totals row)
+                # Start plot after the data table with some margin
+                row_position = len(oot_df_with_totals) + 4  # +4 for margin
+                img.anchor = f'A{row_position}'
+                
+                writer.sheets[sheet_name].add_image(img)
+                
+                # Adjust column widths for better readability
+                for idx, col in enumerate(oot_df_with_totals.columns):
+                    column_width = max(len(str(col)), oot_df_with_totals[col].astype(str).map(len).max())
+                    writer.sheets[sheet_name].column_dimensions[chr(65 + idx)].width = column_width + 2
+            except Exception as e:
+                print(f"Error adding image to Excel for variable {var}: {str(e)}")
     
     # Clean up temporary image files
     for path in plot_paths.values():
