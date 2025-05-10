@@ -7,8 +7,8 @@ import numpy as np
 from openpyxl.drawing.image import Image
 from openpyxl import Workbook
 import openpyxl
-from openpyxl.styles import Alignment, Font
 from typing import List, Optional, Union, Dict, Any, Tuple
+from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
 
 def unified_bivariate_analysis(
     binning_process,
@@ -363,6 +363,37 @@ def unified_bivariate_analysis(
                 for col_num, col_name in enumerate(df_for_excel.columns, 1):
                     cell = worksheet.cell(row=2, column=col_num)
                     cell.font = openpyxl.styles.Font(bold=True)
+
+                                # Define the border style
+                thin_border = Border(
+                    left=Side(style='thin'),
+                    right=Side(style='thin'),
+                    top=Side(style='thin'),
+                    bottom=Side(style='thin')
+                )
+                # Calculate the total number of rows and columns in the table
+                # Add 1 to the row count because we're starting at row 1 (merged header)
+                num_rows = len(df_for_excel) + 2  # +2 for header rows (merged header + column headers)
+                num_columns = len(df_for_excel.columns)
+
+                # Apply borders to all cells in the table
+                for row_num in range(1, num_rows + 1):
+                    for col_num in range(1, num_columns + 1):
+                        cell = worksheet.cell(row=row_num, column=col_num)
+                        cell.border = thin_border
+
+                # You might want to add special styling to the header rows
+                for col_num in range(1, num_columns + 1):
+                    # Style for merged header (row 1)
+                    cell = worksheet.cell(row=1, column=col_num)
+                    cell.border = thin_border
+                    cell.font = openpyxl.styles.Font(bold=True, size=12)
+                    
+                    # Style for column headers (row 2)
+                    cell = worksheet.cell(row=2, column=col_num)
+                    cell.border = thin_border
+                    cell.font = openpyxl.styles.Font(bold=True)
+                    cell.fill = openpyxl.styles.PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")  # Light gray fill
 
                 valid_sheets_created = True
                 
