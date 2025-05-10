@@ -135,22 +135,10 @@ def unified_bivariate_analysis(
                 if 'JS' in train_df.columns:
                     train_df = train_df.drop(columns='JS')
                 
-                # Calculate IV if it doesn't exist
-                if 'IV' not in train_df.columns:
-                    # Calculate IV for each bin
-                    train_df['IV'] = train_df.apply(
-                        lambda row: (row['Non-event (%)'] - row['Event (%)']) * row['WoE'] 
-                        if row.name != 'Totals' else np.nan, 
-                        axis=1
-                    )
-                    
-                    # Calculate total IV (sum of all bin IVs)
-                    total_iv = train_df['IV'].sum()
-                    
-                    # Add total IV to the Totals row if it exists
-                    if 'Totals' in train_df.index:
-                        train_df.loc['Totals', 'IV'] = total_iv
-                
+                train_df[['Count (%)', 'Event rate', 'IV']] = (train_df[['Count (%)', 'Event rate', 'IV']] * 100).round(2)
+                train_df['WoE'] = pd.to_numeric(train_df['WoE'], errors='coerce')
+                train_df['WoE'] = train_df['WoE'].round(4)
+
                 # Keep the original DataFrame for Excel output including Totals row
                 train_df_for_excel = train_df.reset_index()
                 
@@ -280,8 +268,22 @@ def unified_bivariate_analysis(
                     # Add totals row to OOT data
                     oot_df_with_totals = pd.concat([oot_df, pd.DataFrame([totals_row_oot])], ignore_index=True)
                     
+                    oot_df_with_totals[['Count (%)', 'Event rate', 'IV']] = (oot_df_with_totals[['Count (%)', 'Event rate', 'IV']] * 100).round(2)
+                    oot_df_with_totals['WoE'] = pd.to_numeric(oot_df_with_totals['WoE'], errors='coerce')
+                    oot_df_with_totals['WoE'] = oot_df_with_totals['WoE'].round(4)
+
                     # Add Dataset column to OOT data
                     oot_df_with_totals.insert(0, 'Dataset', 'OOT')
+
+                    # Extract the Totals row and prepare for plotting
+                    oot_totals_row = None
+                    oot_df_no_totals = oot_df_with_totals.set_index('index')
+                    if 'Totals' in oot_df_no_totals.index:
+                        oot_totals_row = oot_df_no_totals.loc['Totals']
+                        oot_df_no_totals = oot_df_no_totals.drop('Totals')
+
+                    # Reset index for plotting
+                    oot_df_reset = oot_df_no_totals.reset_index()
                     
                     # Store OOT binning table
                     oot_binning_tables[var] = oot_df_with_totals
@@ -381,8 +383,8 @@ def unified_bivariate_analysis(
                 elif mode == "oot_only":
                     # Plot OOT data only
                     plot_single_dataset(
-                        ax1, oot_df, bin_col_name, metric_column, 
-                        y_axis_label, pd.Series({'Event rate': total_event_rate_oot, 'WoE': '', 'IV': total_iv_oot}), 
+                        ax1, oot_df_reset, bin_col_name, metric_column, 
+                        y_axis_label, oot_totals_row, 
                         "OOT", line_color='darkgoldenrod', bar_color='#0a3f7d', show_bar_values=show_bar_values
                     )
                     plt.title(f'{var}: {y_axis_label} by Bin (OOT Data)', fontsize=12)
@@ -390,8 +392,8 @@ def unified_bivariate_analysis(
                 else:  # oot_comparison
                     # Plot comparison between training and OOT data
                     plot_comparison(
-                        ax1, train_df_reset, oot_df, bin_col_name, metric_column, 
-                        y_axis_label, train_totals_row, total_event_rate_oot, metric, show_bar_values=show_bar_values
+                        ax1, train_df_reset, oot_df_reset, bin_col_name, metric_column, 
+                        y_axis_label, train_totals_row, round(total_event_rate_oot*100,2), metric, show_bar_values=show_bar_values
                     )
                     plt.title(f'{var}: {y_axis_label} Comparison (Training vs OOT)', fontsize=12)
                 
@@ -481,7 +483,7 @@ def plot_single_dataset(
             bin_labels.append(shortened_name)
     
     # Plot Count (%) as bars
-    bars = ax1.bar(x_indices, df['Count (%)'] * 100, color=bar_color, alpha=0.7)
+    bars = ax1.bar(x_indices, df['Count (%)'], color=bar_color, alpha=0.7)
     
     # Add value labels on top of bars if requested
     if show_bar_values:
@@ -515,7 +517,7 @@ def plot_single_dataset(
             
             # Add value annotations
             for idx, val in zip(regular_indices, regular_bins[metric_column]):
-                ax2.annotate(f'{val:.3f}', 
+                ax2.annotate(f'{val:.2f}', 
                              xy=(idx, val), 
                              xytext=(0, 5),
                              textcoords='offset points',
@@ -530,7 +532,7 @@ def plot_single_dataset(
             ax2.plot(idx, special_val,
                      marker='s', color='red', markersize=8, linestyle='None', 
                      label='Special' if idx == special_indices[0] else "")
-            ax2.annotate(f'{special_val:.3f}', 
+            ax2.annotate(f'{special_val:.2f}', 
                          xy=(idx, special_val), 
                          xytext=(0, 5),
                          textcoords='offset points',
@@ -545,7 +547,7 @@ def plot_single_dataset(
             ax2.plot(idx, missing_val,
                      marker='D', color='purple', markersize=8, linestyle='None', 
                      label='Missing' if idx == missing_indices[0] else "")
-            ax2.annotate(f'{missing_val:.3f}', 
+            ax2.annotate(f'{missing_val:.2f}', 
                          xy=(idx, missing_val), 
                          xytext=(0, 5),
                          textcoords='offset points',
@@ -638,7 +640,7 @@ def plot_comparison(
         # If bin exists in training data, get its value; otherwise NaN
         if not train_row.empty:
             train_values.append(train_row[metric_column].values[0])
-            train_counts.append(train_row['Count (%)'].values[0] * 100)  # Convert to percentage
+            train_counts.append(train_row['Count (%)'].values[0])  # Convert to percentage
         else:
             train_values.append(np.nan)
             train_counts.append(0)
@@ -646,7 +648,7 @@ def plot_comparison(
         # If bin exists in OOT data, get its value; otherwise NaN
         if not oot_row.empty:
             oot_values.append(oot_row[metric_column].values[0])
-            oot_counts.append(oot_row['Count (%)'].values[0] * 100)  # Convert to percentage
+            oot_counts.append(oot_row['Count (%)'].values[0])  # Convert to percentage
         else:
             oot_values.append(np.nan)
             oot_counts.append(0)
@@ -723,7 +725,7 @@ def plot_comparison(
             
             # Add value annotations for training line
             for idx in valid_train_idx:
-                ax2.annotate(f'{train_values[idx]:.3f}', 
+                ax2.annotate(f'{train_values[idx]:.2f}', 
                              xy=(idx, train_values[idx]), 
                              xytext=(0, 5),
                              textcoords='offset points',
@@ -740,7 +742,7 @@ def plot_comparison(
             
             # Add value annotations for OOT line
             for idx in valid_oot_idx:
-                ax2.annotate(f'{oot_values[idx]:.3f}', 
+                ax2.annotate(f'{oot_values[idx]:.2f}', 
                              xy=(idx, oot_values[idx]), 
                              xytext=(0, -15),
                              textcoords='offset points',
@@ -754,7 +756,7 @@ def plot_comparison(
             ax2.plot(idx, train_values[idx],
                      marker='s', color='red', markersize=8, linestyle='None', 
                      label='Train Special' if idx == special_indices[0] else "")
-            ax2.annotate(f'{train_values[idx]:.3f}', 
+            ax2.annotate(f'{train_values[idx]:.2f}', 
                          xy=(idx, train_values[idx]), 
                          xytext=(-10, 5),
                          textcoords='offset points',
@@ -766,7 +768,7 @@ def plot_comparison(
             ax2.plot(idx, oot_values[idx],
                      marker='s', color='darkred', markersize=8, linestyle='None', 
                      label='OOT Special' if idx == special_indices[0] else "")
-            ax2.annotate(f'{oot_values[idx]:.3f}', 
+            ax2.annotate(f'{oot_values[idx]:.2f}', 
                          xy=(idx, oot_values[idx]), 
                          xytext=(10, 5),
                          textcoords='offset points',
@@ -780,7 +782,7 @@ def plot_comparison(
             ax2.plot(idx, train_values[idx],
                      marker='D', color='purple', markersize=8, linestyle='None', 
                      label='Train Missing' if idx == missing_indices[0] else "")
-            ax2.annotate(f'{train_values[idx]:.3f}', 
+            ax2.annotate(f'{train_values[idx]:.2f}', 
                          xy=(idx, train_values[idx]), 
                          xytext=(-10, 5),
                          textcoords='offset points',
@@ -792,7 +794,7 @@ def plot_comparison(
             ax2.plot(idx, oot_values[idx],
                      marker='D', color='darkmagenta', markersize=8, linestyle='None', 
                      label='OOT Missing' if idx == missing_indices[0] else "")
-            ax2.annotate(f'{oot_values[idx]:.3f}', 
+            ax2.annotate(f'{oot_values[idx]:.2f}', 
                          xy=(idx, oot_values[idx]), 
                          xytext=(10, 5),
                          textcoords='offset points',
@@ -827,6 +829,7 @@ def plot_comparison(
     by_label = dict(zip(labels, handles))
     ax2.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=8)
 
+    
 def enhanced_bivariate_plot(
     binning_process,
     filename: str = 'bivariate',
