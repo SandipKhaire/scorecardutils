@@ -280,6 +280,15 @@ def calculate_cumulative_metrics(KS_data, response_name, correlation, lift_index
     
     if lift_index==1 and correlation < 0 :
         KS_data = KS_data.sort_index(ascending=False)
+
+    # Calculate Pop% for each bucket
+    total_population = KS_data['Totals'].sum()
+    KS_data['Pop%'] = np.round((KS_data['Totals'] / total_population) * 100, 2)
+    
+    # Calculate CumPop% - cumulative population percentage
+    KS_data['CumPop%'] = np.round(
+        (KS_data['Totals'] / total_population).cumsum() * 100, 2
+    )
     
     # Cumulative calculations
     KS_data['Cum'+response_name[1]] = np.round(
@@ -325,7 +334,7 @@ def calculate_lift(KS_data, response_name, lift_index):
 
     KS_data=KS_data[['Totals',response_name[1],response_name[1]+'_Rate','Cum'+response_name[1],
                             response_name[0],response_name[0]+'_Rate','Cum'+response_name[0],
-                            'KS','AvgScore','Lift']]
+                            'KS','AvgScore','Pop%', 'CumPop%','Lift']]
     KS_data.reset_index(inplace=True)
     
     return KS_data
@@ -365,7 +374,8 @@ def add_total_row(KS_data, data, score, weights, response_name):
             (KS_data[response_name[0]].sum() / KS_data['Totals'].sum()) * 100, 2
         ),
         'KS': KS_data['KS'].max(),
-        'AvgScore': np.average(data[score], weights=data[weights])
+        'AvgScore': np.average(data[score], weights=data[weights]),
+        'Pop%': 100.0 # Total represents 100% of population
     }
     
     KS_data.loc[len(KS_data)] = sum_row
