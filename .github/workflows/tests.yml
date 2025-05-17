@@ -30,7 +30,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        uv pip install --system pytest pytest-cov
+        uv pip install --system pytest pytest-cov pyyaml
         uv pip install --system -e ".[dev]"
         uv pip install --system optbinning==0.20.1
     

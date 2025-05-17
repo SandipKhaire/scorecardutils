@@ -27,7 +27,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        uv pip install --system sphinx sphinx-rtd-theme sphinx-autoapi myst-parser
+        uv pip install --system sphinx sphinx-rtd-theme sphinx-autoapi myst-parser pyyaml
         uv pip install --system -e ".[dev]"
         uv pip install --system optbinning==0.20.1
     
@@ -35,15 +35,98 @@ jobs:
       run: |
         uv pip list
     
-    - name: Show documentation directory structure
+    - name: Create documentation structure
       run: |
+        mkdir -p docs/source/{_static,_templates,api,examples,usage}
+        
+        if [ ! -f "docs/source/conf.py" ]; then
+          echo "Creating conf.py..."
+          cat > docs/source/conf.py << 'EOL'
+import os
+import sys
+sys.path.insert(0, os.path.abspath('../../src'))
+
+project = 'scorecardutils'
+copyright = '2024'
+author = 'Sandip Khaire'
+
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.viewcode',
+    'sphinx_rtd_theme',
+    'sphinx.ext.githubpages',
+    'myst_parser',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.coverage',
+    'sphinx.ext.inheritance_diagram',
+    'autoapi.extension'
+]
+
+autoapi_type = 'python'
+autoapi_dirs = ['../../src/scorecardutils']
+autoapi_add_toctree_entry = True
+
+templates_path = ['_templates']
+exclude_patterns = []
+
+html_theme = 'sphinx_rtd_theme'
+html_static_path = ['_static']
+EOL
+        fi
+
+        if [ ! -f "docs/source/index.rst" ]; then
+          echo "Creating index.rst..."
+          cat > docs/source/index.rst << 'EOL'
+Welcome to scorecardutils documentation!
+======================================
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   installation
+   usage/index
+   examples/index
+   api/index
+   
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+EOL
+        fi
+
+        if [ ! -f "docs/source/installation.md" ]; then
+          echo "Creating installation.md..."
+          cat > docs/source/installation.md << 'EOL'
+# Installation
+
+You can install the package using pip:
+
+```bash
+pip install scorecardutils
+```
+
+## Development Installation
+
+For development, clone the repository and install in editable mode:
+
+```bash
+git clone https://github.com/SandipKhaire/scorecardutils.git
+cd scorecardutils
+pip install -e ".[dev]"
+```
+EOL
+        fi
+        
         ls -R docs/
     
     - name: Build documentation
       run: |
         cd docs
-        mkdir -p source/_static
-        mkdir -p source/_templates
         sphinx-build -b html source _build/html -W --keep-going
     
     - name: Deploy to GitHub Pages
