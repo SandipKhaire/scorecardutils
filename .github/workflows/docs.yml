@@ -36,12 +36,13 @@ jobs:
         uv pip list
     
     - name: Create documentation structure
+      shell: bash
       run: |
         mkdir -p docs/source/{_static,_templates,api,examples,usage}
         
         if [ ! -f "docs/source/conf.py" ]; then
           echo "Creating conf.py..."
-          cat > docs/source/conf.py << 'EOL'
+          cat > docs/source/conf.py << 'EOF'
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../../src'))
@@ -72,12 +73,12 @@ exclude_patterns = []
 
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
-EOL
+EOF
         fi
 
         if [ ! -f "docs/source/index.rst" ]; then
           echo "Creating index.rst..."
-          cat > docs/source/index.rst << 'EOL'
+          cat > docs/source/index.rst << 'EOF'
 Welcome to scorecardutils documentation!
 ======================================
 
@@ -96,12 +97,12 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-EOL
+EOF
         fi
 
         if [ ! -f "docs/source/installation.md" ]; then
           echo "Creating installation.md..."
-          cat > docs/source/installation.md << 'EOL'
+          cat > docs/source/installation.md << 'EOF'
 # Installation
 
 You can install the package using pip:
@@ -119,7 +120,7 @@ git clone https://github.com/SandipKhaire/scorecardutils.git
 cd scorecardutils
 pip install -e ".[dev]"
 ```
-EOL
+EOF
         fi
         
         ls -R docs/
