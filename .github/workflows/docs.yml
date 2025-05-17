@@ -12,6 +12,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -25,13 +27,24 @@ jobs:
     
     - name: Install dependencies
       run: |
-        uv pip install -e ".[dev]"
-        uv pip install sphinx sphinx-rtd-theme sphinx-autoapi myst-parser
+        uv pip install --system sphinx sphinx-rtd-theme sphinx-autoapi myst-parser
+        uv pip install --system -e ".[dev]"
+        uv pip install --system optbinning==0.20.1
+    
+    - name: List installed packages
+      run: |
+        uv pip list
+    
+    - name: Show documentation directory structure
+      run: |
+        ls -R docs/
     
     - name: Build documentation
       run: |
         cd docs
-        sphinx-build -b html source _build/html
+        mkdir -p source/_static
+        mkdir -p source/_templates
+        sphinx-build -b html source _build/html -W --keep-going
     
     - name: Deploy to GitHub Pages
       if: github.ref == 'refs/heads/main'
@@ -39,3 +52,4 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./docs/_build/html
+        commit_message: "Deploy documentation for ${{ github.sha }}"
