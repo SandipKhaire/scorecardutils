@@ -9,42 +9,37 @@ on:
 jobs:
   docs:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
-    
-    - name: Install UV
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-    
-    - name: Install dependencies
-      run: |
-        uv pip install --system sphinx sphinx-rtd-theme sphinx-autoapi myst-parser pyyaml
-        uv pip install --system -e ".[dev]"
-        uv pip install --system optbinning==0.20.1
-    
-    - name: List installed packages
-      run: |
-        uv pip list
-    
-    - name: Create documentation structure
-      shell: bash
-      run: |
-        mkdir -p docs/source/{_static,_templates,api,examples,usage}
-        
-        if [ ! -f "docs/source/conf.py" ]; then
-          echo "Creating conf.py..."
-          cat > docs/source/conf.py << 'CONFEOF'
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - name: Install UV
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Install dependencies
+        run: |
+          uv pip install --system sphinx sphinx-rtd-theme sphinx-autoapi myst-parser pyyaml
+          uv pip install --system -e ".[dev]"
+          uv pip install --system optbinning==0.20.1
+      - name: List installed packages
+        run: |
+          uv pip list
+      - name: Create documentation structure
+        shell: bash
+        run: |
+          mkdir -p docs/source/{_static,_templates,api,examples,usage}
+          
+          if [ ! -f "docs/source/conf.py" ]; then
+            echo "Creating conf.py..."
+            cat > docs/source/conf.py << 'CONFEOF'
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('../../src'))
 
 project = 'scorecardutils'
@@ -74,11 +69,11 @@ exclude_patterns = []
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 CONFEOF
-        fi
-
-        if [ ! -f "docs/source/index.rst" ]; then
-          echo "Creating index.rst..."
-          cat > docs/source/index.rst << 'INDEXEOF'
+          fi
+          
+          if [ ! -f "docs/source/index.rst" ]; then
+            echo "Creating index.rst..."
+            cat > docs/source/index.rst << 'INDEXEOF'
 Welcome to scorecardutils documentation!
 ======================================
 
@@ -90,7 +85,7 @@ Welcome to scorecardutils documentation!
    usage/index
    examples/index
    api/index
-   
+
 Indices and tables
 ==================
 
@@ -98,11 +93,11 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 INDEXEOF
-        fi
-
-        if [ ! -f "docs/source/installation.md" ]; then
-          echo "Creating installation.md..."
-          cat > docs/source/installation.md << 'INSTALLEOF'
+          fi
+          
+          if [ ! -f "docs/source/installation.md" ]; then
+            echo "Creating installation.md..."
+            cat > docs/source/installation.md << 'INSTALLEOF'
 # Installation
 
 You can install the package using pip:
@@ -121,19 +116,17 @@ cd scorecardutils
 pip install -e ".[dev]"
 ```
 INSTALLEOF
-        fi
-        
-        ls -R docs/
-    
-    - name: Build documentation
-      run: |
-        cd docs
-        sphinx-build -b html source _build/html -W --keep-going
-    
-    - name: Deploy to GitHub Pages
-      if: github.ref == 'refs/heads/main'
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./docs/_build/html
-        commit_message: "Deploy documentation for ${{ github.sha }}"
+          fi
+          
+          ls -R docs/
+      - name: Build documentation
+        run: |
+          cd docs
+          sphinx-build -b html source _build/html -W --keep-going
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/_build/html
+          commit_message: "Deploy documentation for ${{ github.sha }}"
