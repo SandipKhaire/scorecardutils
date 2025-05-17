@@ -43,36 +43,36 @@ jobs:
         if [ ! -f "docs/source/conf.py" ]; then
           echo "Creating conf.py..."
           cat > docs/source/conf.py << 'EOF'
-import os
-import sys
-sys.path.insert(0, os.path.abspath('../../src'))
+          import os
+          import sys
+          sys.path.insert(0, os.path.abspath('../../src'))
 
-project = 'scorecardutils'
-copyright = '2024'
-author = 'Sandip Khaire'
+          project = 'scorecardutils'
+          copyright = '2024'
+          author = 'Sandip Khaire'
 
-extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.viewcode',
-    'sphinx_rtd_theme',
-    'sphinx.ext.githubpages',
-    'myst_parser',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.coverage',
-    'sphinx.ext.inheritance_diagram',
-    'autoapi.extension'
-]
+          extensions = [
+              'sphinx.ext.autodoc',
+              'sphinx.ext.napoleon',
+              'sphinx.ext.viewcode',
+              'sphinx_rtd_theme',
+              'sphinx.ext.githubpages',
+              'myst_parser',
+              'sphinx.ext.autosummary',
+              'sphinx.ext.coverage',
+              'sphinx.ext.inheritance_diagram',
+              'autoapi.extension'
+          ]
 
-autoapi_type = 'python'
-autoapi_dirs = ['../../src/scorecardutils']
-autoapi_add_toctree_entry = True
+          autoapi_type = 'python'
+          autoapi_dirs = ['../../src/scorecardutils']
+          autoapi_add_toctree_entry = True
 
-templates_path = ['_templates']
-exclude_patterns = []
+          templates_path = ['_templates']
+          exclude_patterns = []
 
-html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
+          html_theme = 'sphinx_rtd_theme'
+          html_static_path = ['_static']
 EOF
         fi
 
