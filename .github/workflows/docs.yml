@@ -42,43 +42,43 @@ jobs:
         
         if [ ! -f "docs/source/conf.py" ]; then
           echo "Creating conf.py..."
-          cat > docs/source/conf.py << 'EOF'
-          import os
-          import sys
-          sys.path.insert(0, os.path.abspath('../../src'))
+          cat > docs/source/conf.py << 'CONFEOF'
+import os
+import sys
+sys.path.insert(0, os.path.abspath('../../src'))
 
-          project = 'scorecardutils'
-          copyright = '2024'
-          author = 'Sandip Khaire'
+project = 'scorecardutils'
+copyright = '2024'
+author = 'Sandip Khaire'
 
-          extensions = [
-              'sphinx.ext.autodoc',
-              'sphinx.ext.napoleon',
-              'sphinx.ext.viewcode',
-              'sphinx_rtd_theme',
-              'sphinx.ext.githubpages',
-              'myst_parser',
-              'sphinx.ext.autosummary',
-              'sphinx.ext.coverage',
-              'sphinx.ext.inheritance_diagram',
-              'autoapi.extension'
-          ]
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.viewcode',
+    'sphinx_rtd_theme',
+    'sphinx.ext.githubpages',
+    'myst_parser',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.coverage',
+    'sphinx.ext.inheritance_diagram',
+    'autoapi.extension'
+]
 
-          autoapi_type = 'python'
-          autoapi_dirs = ['../../src/scorecardutils']
-          autoapi_add_toctree_entry = True
+autoapi_type = 'python'
+autoapi_dirs = ['../../src/scorecardutils']
+autoapi_add_toctree_entry = True
 
-          templates_path = ['_templates']
-          exclude_patterns = []
+templates_path = ['_templates']
+exclude_patterns = []
 
-          html_theme = 'sphinx_rtd_theme'
-          html_static_path = ['_static']
-EOF
+html_theme = 'sphinx_rtd_theme'
+html_static_path = ['_static']
+CONFEOF
         fi
 
         if [ ! -f "docs/source/index.rst" ]; then
           echo "Creating index.rst..."
-          cat > docs/source/index.rst << 'EOF'
+          cat > docs/source/index.rst << 'INDEXEOF'
 Welcome to scorecardutils documentation!
 ======================================
 
@@ -97,12 +97,12 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-EOF
+INDEXEOF
         fi
 
         if [ ! -f "docs/source/installation.md" ]; then
           echo "Creating installation.md..."
-          cat > docs/source/installation.md << 'EOF'
+          cat > docs/source/installation.md << 'INSTALLEOF'
 # Installation
 
 You can install the package using pip:
@@ -120,7 +120,7 @@ git clone https://github.com/SandipKhaire/scorecardutils.git
 cd scorecardutils
 pip install -e ".[dev]"
 ```
-EOF
+INSTALLEOF
         fi
         
         ls -R docs/
