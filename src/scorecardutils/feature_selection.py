@@ -379,10 +379,10 @@ def jeffrey(p_1, p_2, return_sum=True):
     p_2_safe = np.maximum(p_2, 1e-10)
     
     # Calculate Jeffrey divergence and multiply by 100
-    divergence = ((p_1_safe - p_2_safe) * np.log(p_1_safe / p_2_safe)) * 100
+    divergence = ((p_1_safe - p_2_safe) * np.log(p_1_safe / p_2_safe)) *100
     
     # Round to 2 decimal places
-    divergence = np.round(divergence, 2)
+    divergence = np.round(divergence, 4)
     
     # Return sum if requested, otherwise return the array
     return np.sum(divergence) if return_sum else divergence
@@ -409,8 +409,8 @@ def process_variable(name, X_oot, X_train, binning_process, psi_min_bin_size=0.0
     # Calculate proportions
     t_records_a = bin_counts_a.sum()
     t_records_e = bin_counts_e.sum()
-    prop_a = np.round(bin_counts_a / t_records_a,2)
-    prop_e = np.round(bin_counts_e / t_records_e,2)
+    prop_a = np.round(bin_counts_a / t_records_a,4)
+    prop_e = np.round(bin_counts_e / t_records_e,4)
     
     # Calculate PSI
     psi = jeffrey(prop_a, prop_e, return_sum=False)
