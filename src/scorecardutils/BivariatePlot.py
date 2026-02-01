@@ -350,50 +350,103 @@ def unified_bivariate_analysis(
                 df_for_excel = df_for_excel[existing_columns]
                 
                 # Write to Excel
-                df_for_excel.to_excel(writer, sheet_name=sheet_name, index=False,startrow=1)
+                df_for_excel.to_excel(writer, sheet_name=sheet_name, index=False, startrow=1)
 
                 worksheet = writer.sheets[sheet_name]
                 num_columns = len(df_for_excel.columns)
-                worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_columns)
-                merged_cell = worksheet.cell(row=1, column=1)
-                merged_cell.value = var  # Set the variable name
-                merged_cell.alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
-                merged_cell.font = openpyxl.styles.Font(bold=True, size=12)
-                
-                for col_num, col_name in enumerate(df_for_excel.columns, 1):
-                    cell = worksheet.cell(row=2, column=col_num)
-                    cell.font = openpyxl.styles.Font(bold=True)
+                num_rows = len(df_for_excel) + 2
 
-                                # Define the border style
-                thin_border = Border(
-                    left=Side(style='thin'),
-                    right=Side(style='thin'),
-                    top=Side(style='thin'),
-                    bottom=Side(style='thin')
+                white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+                title_fill = PatternFill(start_color="2A6F97", end_color="2A6F97", fill_type="solid")
+                header_fill = PatternFill(start_color="468FAF", end_color="468FAF", fill_type="solid")
+                totals_fill = PatternFill(start_color="D6EAF8", end_color="D6EAF8", fill_type="solid")
+                inner_border = Border(
+                    left=Side(style='thin', color='BDC3C7'),
+                    right=Side(style='thin', color='BDC3C7'),
+                    top=Side(style='thin', color='BDC3C7'),
+                    bottom=Side(style='thin', color='BDC3C7')
                 )
-                # Calculate the total number of rows and columns in the table
-                # Add 1 to the row count because we're starting at row 1 (merged header)
-                num_rows = len(df_for_excel) + 2  # +2 for header rows (merged header + column headers)
-                num_columns = len(df_for_excel.columns)
+                totals_border = Border(
+                    left=Side(style='thin', color='BDC3C7'),
+                    right=Side(style='thin', color='BDC3C7'),
+                    top=Side(style='medium', color='2A6F97'),
+                    bottom=Side(style='medium', color='2A6F97')
+                )
+                title_font = Font(bold=True, size=13, color="FFFFFF", name='Calibri')
+                header_font = Font(bold=True, size=11, color="FFFFFF", name='Calibri')
+                data_font = Font(size=11, color="1B2631", name='Calibri')
+                totals_font = Font(bold=True, size=11, color="1A5276", name='Calibri')
 
-                # Apply borders to all cells in the table
-                for row_num in range(1, num_rows + 1):
+                # Detect totals and blank separator rows
+                totals_excel_rows = set()
+                blank_excel_rows = set()
+                for i in range(len(df_for_excel)):
+                    row_data = df_for_excel.iloc[i]
+                    bin_val = str(row_data.get(bin_col_name, '')).strip()
+                    if str(row_data.get('Dataset', '')).strip() == '' and bin_val == '' and str(row_data.get('Count', '')).strip() == '':
+                        blank_excel_rows.add(i + 3)
+                        continue
+                    if bin_val == 'Totals':
+                        totals_excel_rows.add(i + 3)
+                    elif bin_val == '':
+                        try:
+                            if float(row_data.get('Count (%)', 0)) >= 99.99:
+                                totals_excel_rows.add(i + 3)
+                        except (ValueError, TypeError):
+                            pass
+
+                # White fill for entire visible sheet area (up to column BB)
+                for row_num in range(1, max(num_rows + 50, 100)):
+                    for col_num in range(1, 55):
+                        worksheet.cell(row=row_num, column=col_num).fill = white_fill
+
+                # Title row
+                worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_columns)
+                worksheet.cell(row=1, column=1).value = var
+                worksheet.row_dimensions[1].height = 30
+                for col_num in range(1, num_columns + 1):
+                    cell = worksheet.cell(row=1, column=col_num)
+                    cell.fill = title_fill
+                    cell.font = title_font
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+                    cell.border = Border(
+                        left=Side(style='medium', color='2A6F97'),
+                        right=Side(style='medium', color='2A6F97'),
+                        top=Side(style='medium', color='2A6F97'),
+                        bottom=Side(style='thin', color='2A6F97')
+                    )
+
+                # Column headers
+                worksheet.row_dimensions[2].height = 26
+                for col_num in range(1, num_columns + 1):
+                    cell = worksheet.cell(row=2, column=col_num)
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+                    cell.border = Border(
+                        left=Side(style='thin', color='468FAF'),
+                        right=Side(style='thin', color='468FAF'),
+                        top=Side(style='thin', color='2A6F97'),
+                        bottom=Side(style='medium', color='2A6F97')
+                    )
+
+                # Data rows
+                for row_num in range(3, num_rows + 1):
+                    worksheet.row_dimensions[row_num].height = 20
+                    if row_num in blank_excel_rows:
+                        worksheet.row_dimensions[row_num].height = 8
+                        for col_num in range(1, num_columns + 1):
+                            cell = worksheet.cell(row=row_num, column=col_num)
+                            cell.fill = white_fill
+                            cell.border = Border()
+                        continue
+                    is_totals = row_num in totals_excel_rows
                     for col_num in range(1, num_columns + 1):
                         cell = worksheet.cell(row=row_num, column=col_num)
-                        cell.border = thin_border
-
-                # You might want to add special styling to the header rows
-                for col_num in range(1, num_columns + 1):
-                    # Style for merged header (row 1)
-                    cell = worksheet.cell(row=1, column=col_num)
-                    cell.border = thin_border
-                    cell.font = openpyxl.styles.Font(bold=True, size=12)
-                    
-                    # Style for column headers (row 2)
-                    cell = worksheet.cell(row=2, column=col_num)
-                    cell.border = thin_border
-                    cell.font = openpyxl.styles.Font(bold=True)
-                    cell.fill = openpyxl.styles.PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")  # Light gray fill
+                        cell.fill = totals_fill if is_totals else white_fill
+                        cell.font = totals_font if is_totals else data_font
+                        cell.border = totals_border if is_totals else inner_border
+                        cell.alignment = Alignment(vertical='center')
 
                 valid_sheets_created = True
                 
@@ -406,9 +459,9 @@ def unified_bivariate_analysis(
                 if mode == "train_only":
                     # Plot training data only
                     plot_single_dataset(
-                        ax1, train_df_reset, bin_col_name, metric_column, 
-                        y_axis_label, train_totals_row, "Training", line_color='darkgoldenrod', 
-                        bar_color='#0a3f7d', show_bar_values=show_bar_values
+                        ax1, train_df_reset, bin_col_name, metric_column,
+                        y_axis_label, train_totals_row, "Training", line_color='#1E8449',
+                        bar_color='#2A6F97', show_bar_values=show_bar_values
                     )
                     plt.title(f'{var}: {y_axis_label} by Bin (Training Data)', fontsize=12)
                     
@@ -417,7 +470,7 @@ def unified_bivariate_analysis(
                     plot_single_dataset(
                         ax1, oot_df_reset, bin_col_name, metric_column, 
                         y_axis_label, oot_totals_row, 
-                        "OOT", line_color='darkgoldenrod', bar_color='#0a3f7d', show_bar_values=show_bar_values
+                        "OOT", line_color='#1E8449', bar_color='#2A6F97', show_bar_values=show_bar_values
                     )
                     plt.title(f'{var}: {y_axis_label} by Bin (OOT Data)', fontsize=12)
                     
@@ -450,7 +503,7 @@ def unified_bivariate_analysis(
                     # Adjust column widths
                     for idx, col in enumerate(df_for_excel.columns):
                         column_width = max(len(str(col)), df_for_excel[col].astype(str).map(len).max())
-                        writer.sheets[sheet_name].column_dimensions[chr(65 + idx)].width = column_width + 2
+                        writer.sheets[sheet_name].column_dimensions[chr(65 + idx)].width = column_width + 4
                 except Exception as e:
                     if verbose:
                         print(f"Error adding image to Excel for variable {var}: {str(e)}")
@@ -485,7 +538,7 @@ def unified_bivariate_analysis(
 
 def plot_single_dataset(
     ax1, df, bin_col_name, metric_column, y_axis_label, 
-    totals_row, dataset_name, line_color='darkgoldenrod', bar_color='#0a3f7d',
+    totals_row, dataset_name, line_color='#1E8449', bar_color='#2A6F97',
     show_bar_values=False
 ) -> None:
     """
@@ -532,12 +585,12 @@ def plot_single_dataset(
     ax1.set_xticks(x_indices)
     ax1.set_xticklabels(bin_labels, rotation=45, ha='right', fontsize=9)
     ax1.set_xlabel('Bins', fontsize=10)
-    ax1.set_ylabel('Count (%)', color='blue', fontsize=10)
-    ax1.tick_params(axis='y', labelcolor='blue', labelsize=9)
-    
+    ax1.set_ylabel('Count (%)', color='#2A6F97', fontsize=10)
+    ax1.tick_params(axis='y', labelcolor='#2A6F97', labelsize=9)
+
     # Create second y-axis for Event Rate or WoE
     ax2 = ax1.twinx()
-    
+
     # Plot the metric line for regular bins only
     if not regular_bins.empty:
         regular_mask = ~df[bin_col_name].str.contains('Special|Missing', regex=True, na=False)
@@ -698,8 +751,8 @@ def plot_comparison(
     
     # Plot Count (%) as grouped bars
     bar_width = 0.35
-    bar1 = ax1.bar(x_indices - bar_width/2, train_counts, bar_width, color='#0a3f7d', alpha=0.7, label='Train Count (%)')
-    bar2 = ax1.bar(x_indices + bar_width/2, oot_counts, bar_width, color='#d35400', alpha=0.7, label='OOT Count (%)')
+    bar1 = ax1.bar(x_indices - bar_width/2, train_counts, bar_width, color='#2A6F97', alpha=0.85, label='Train Count (%)')
+    bar2 = ax1.bar(x_indices + bar_width/2, oot_counts, bar_width, color='#E76F51', alpha=0.85, label='OOT Count (%)')
     
     # Add value labels on top of bars if requested
     if show_bar_values:
@@ -712,9 +765,9 @@ def plot_comparison(
                     h1 + 0.5,
                     f'{h1:.1f}%',
                     ha='center', va='bottom',
-                    fontsize=8, color='navy'
+                    fontsize=8, fontweight='bold', color='#1A5276'
                 )
-            
+
             # OOT bar values
             h2 = b2.get_height()
             if h2 > 0:
@@ -723,14 +776,14 @@ def plot_comparison(
                     h2 + 0.5,
                     f'{h2:.1f}%',
                     ha='center', va='bottom',
-                    fontsize=8, color='darkred'
+                    fontsize=8, fontweight='bold', color='#A93226'
                 )
     
     ax1.set_xticks(x_indices)
     ax1.set_xticklabels(bin_labels, rotation=45, ha='right', fontsize=9)
     ax1.set_xlabel('Bins', fontsize=10)
-    ax1.set_ylabel('Count (%)', color='blue', fontsize=10)
-    ax1.tick_params(axis='y', labelcolor='blue', labelsize=9)
+    ax1.set_ylabel('Count (%)', color='#2A6F97', fontsize=10)
+    ax1.tick_params(axis='y', labelcolor='#2A6F97', labelsize=9)
     ax1.legend(loc='upper left', fontsize=8)
     
     # Create second y-axis for Event Rate or WoE
@@ -750,37 +803,34 @@ def plot_comparison(
         
         if valid_train_idx:
             # Plot training data line
-            train_line = ax2.plot([i for i in valid_train_idx], 
-                                  [train_values[i] for i in valid_train_idx], 
-                                  marker='o', color='darkgoldenrod', linewidth=2, 
+            train_line = ax2.plot([i for i in valid_train_idx],
+                                  [train_values[i] for i in valid_train_idx],
+                                  marker='o', color='#1E8449', linewidth=2.5,
                                   label=f'Train {y_axis_label}')
-            
-            # Add value annotations for training line
+
             for idx in valid_train_idx:
-                ax2.annotate(f'{train_values[idx]:.2f}', 
-                             xy=(idx, train_values[idx]), 
-                             xytext=(0, 5),
+                ax2.annotate(f'{train_values[idx]:.2f}',
+                             xy=(idx, train_values[idx]),
+                             xytext=(0, 6),
                              textcoords='offset points',
-                             ha='center', 
-                             fontsize=7,
-                             color='darkgoldenrod')
-        
+                             ha='center',
+                             fontsize=8, fontweight='bold',
+                             color='#145A32')
+
         if valid_oot_idx:
-            # Plot OOT data line
-            oot_line = ax2.plot([i for i in valid_oot_idx], 
-                                [oot_values[i] for i in valid_oot_idx], 
-                                marker='s', color='darkgreen', linewidth=2, 
+            oot_line = ax2.plot([i for i in valid_oot_idx],
+                                [oot_values[i] for i in valid_oot_idx],
+                                marker='s', color='#6C3483', linewidth=2.5,
                                 label=f'OOT {y_axis_label}')
-            
-            # Add value annotations for OOT line
+
             for idx in valid_oot_idx:
-                ax2.annotate(f'{oot_values[idx]:.2f}', 
-                             xy=(idx, oot_values[idx]), 
+                ax2.annotate(f'{oot_values[idx]:.2f}',
+                             xy=(idx, oot_values[idx]),
                              xytext=(0, -15),
                              textcoords='offset points',
-                             ha='center', 
-                             fontsize=7,
-                             color='darkgreen')
+                             ha='center',
+                             fontsize=8, fontweight='bold',
+                             color='#512E5F')
     
     # Plot Special bin points
     for idx in special_indices:
@@ -838,7 +888,7 @@ def plot_comparison(
     if train_totals_row is not None and metric_column in train_totals_row:
         try:
             train_total_metric = float(train_totals_row[metric_column]) if train_totals_row[metric_column] != '' else 0.0
-            ax2.axhline(y=train_total_metric, color='darkgoldenrod', linestyle='--', 
+            ax2.axhline(y=train_total_metric, color='#1E8449', linestyle='--', 
                        alpha=0.7, label=f'Train Total: {train_total_metric:.4f}')
         except (ValueError, TypeError):
             pass
@@ -846,7 +896,7 @@ def plot_comparison(
     if total_event_rate_oot is not None and metric == 'event_rate':
         try:
             oot_total_metric = float(total_event_rate_oot)
-            ax2.axhline(y=oot_total_metric, color='darkgreen', linestyle='--', 
+            ax2.axhline(y=oot_total_metric, color='#6C3483', linestyle='--', 
                        alpha=0.7, label=f'OOT Total: {oot_total_metric:.4f}')
         except (ValueError, TypeError):
             pass
