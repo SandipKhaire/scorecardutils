@@ -10,6 +10,20 @@ import openpyxl
 from typing import List, Optional, Union, Dict, Any, Tuple
 from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
 
+# Professional color palette for charts
+CHART_COLORS = {
+    'train_bar': "#2A6F97",       # Office blue
+    'oot_bar': "#E76F51",         # Office orange
+    'train_line': "#BB3D4E",      # Emerald green
+    'oot_line': '#8E44AD',        # Amethyst purple
+    'train_special': '#C0392B',   # Dark red
+    'oot_special': '#922B21',     # Darker red
+    'train_missing': '#2980B9',   # Steel blue
+    'oot_missing': '#1F618D',     # Darker steel blue
+    'train_label': '#1E8449',     # Dark green for text
+    'oot_label': '#6C3483',       # Dark purple for text
+}
+
 def unified_bivariate_analysis(
     binning_process,
     filename: str = 'bivariate_analysis',
@@ -460,25 +474,29 @@ def unified_bivariate_analysis(
                     # Plot training data only
                     plot_single_dataset(
                         ax1, train_df_reset, bin_col_name, metric_column,
-                        y_axis_label, train_totals_row, "Training", line_color='#1E8449',
-                        bar_color='#2A6F97', show_bar_values=show_bar_values
+                        y_axis_label, train_totals_row, "Training",
+                        line_color=CHART_COLORS['train_line'],
+                        bar_color=CHART_COLORS['train_bar'],
+                        show_bar_values=show_bar_values
                     )
                     plt.title(f'{var}: {y_axis_label} by Bin (Training Data)', fontsize=12)
-                    
+
                 elif mode == "oot_only":
                     # Plot OOT data only
                     plot_single_dataset(
-                        ax1, oot_df_reset, bin_col_name, metric_column, 
-                        y_axis_label, oot_totals_row, 
-                        "OOT", line_color='#1E8449', bar_color='#2A6F97', show_bar_values=show_bar_values
+                        ax1, oot_df_reset, bin_col_name, metric_column,
+                        y_axis_label, oot_totals_row,
+                        "OOT", line_color=CHART_COLORS['oot_line'],
+                        bar_color=CHART_COLORS['oot_bar'],
+                        show_bar_values=show_bar_values
                     )
                     plt.title(f'{var}: {y_axis_label} by Bin (OOT Data)', fontsize=12)
                     
                 else:  # oot_comparison
                     # Plot comparison between training and OOT data
                     plot_comparison(
-                        ax1, train_df_reset, oot_df_reset, bin_col_name, metric_column, 
-                        y_axis_label, train_totals_row, round(total_event_rate_oot*100,2), metric, show_bar_values=show_bar_values
+                        ax1, train_df_reset, oot_df_reset, bin_col_name, metric_column,
+                        y_axis_label, train_totals_row, oot_totals_row, metric, show_bar_values=show_bar_values
                     )
                     plt.title(f'{var}: {y_axis_label} Comparison (Training vs OOT)', fontsize=12)
                 
@@ -537,8 +555,8 @@ def unified_bivariate_analysis(
 
 
 def plot_single_dataset(
-    ax1, df, bin_col_name, metric_column, y_axis_label, 
-    totals_row, dataset_name, line_color='#1E8449', bar_color='#2A6F97',
+    ax1, df, bin_col_name, metric_column, y_axis_label,
+    totals_row, dataset_name, line_color='#27AE60', bar_color='#3498DB',
     show_bar_values=False
 ) -> None:
     """
@@ -546,15 +564,15 @@ def plot_single_dataset(
     """
     # Ensure bin column is string type
     df[bin_col_name] = df[bin_col_name].astype(str)
-    
+
     # Identify regular, special, and missing bins
     regular_bins = df[~df[bin_col_name].str.contains('Special|Missing', regex=True, na=False)]
     special_bin = df[df[bin_col_name].str.contains('Special', regex=False, na=False)]
     missing_bin = df[df[bin_col_name].str.contains('Missing', regex=False, na=False)]
-    
+
     # Create indices for x-axis
     x_indices = np.arange(len(df))
-    
+
     # Format bin labels
     bin_labels = []
     for _, row in df.iterrows():
@@ -566,83 +584,94 @@ def plot_single_dataset(
             if len(shortened_name) > 15:
                 shortened_name = shortened_name[:12] + "..."
             bin_labels.append(shortened_name)
-    
-    # Plot Count (%) as bars
-    bars = ax1.bar(x_indices, df['Count (%)'], color=bar_color, alpha=0.7)
-    
+
+    # Plot Count (%) as bars with improved styling
+    bars = ax1.bar(x_indices, df['Count (%)'], color=bar_color, alpha=0.85, edgecolor='white', linewidth=0.5)
+
     # Add value labels on top of bars if requested
     if show_bar_values:
         for i, bar in enumerate(bars):
             height = bar.get_height()
-            ax1.text(
-                bar.get_x() + bar.get_width()/2.,
-                height + 0.5,
-                f'{height:.1f}%',
-                ha='center', va='bottom',
-                fontsize=8, color='black'
-            )
-    
+            if height > 0:
+                ax1.text(
+                    bar.get_x() + bar.get_width()/2.,
+                    height + 0.3,
+                    f'{height:.1f}%',
+                    ha='center', va='bottom',
+                    fontsize=8, fontweight='bold', color=bar_color,
+                    bbox=dict(boxstyle='round,pad=0.2', facecolor='white', edgecolor='none', alpha=0.7)
+                )
+
     ax1.set_xticks(x_indices)
     ax1.set_xticklabels(bin_labels, rotation=45, ha='right', fontsize=9)
-    ax1.set_xlabel('Bins', fontsize=10)
-    ax1.set_ylabel('Count (%)', color='#2A6F97', fontsize=10)
-    ax1.tick_params(axis='y', labelcolor='#2A6F97', labelsize=9)
+    ax1.set_xlabel('Bins', fontsize=10, fontweight='bold')
+    ax1.set_ylabel('Count (%)', color=bar_color, fontsize=10, fontweight='bold')
+    ax1.tick_params(axis='y', labelcolor=bar_color, labelsize=9)
 
     # Create second y-axis for Event Rate or WoE
     ax2 = ax1.twinx()
+
+    # Label style for line annotations
+    label_bbox = dict(boxstyle='round,pad=0.2', facecolor='white', edgecolor='none', alpha=0.8)
 
     # Plot the metric line for regular bins only
     if not regular_bins.empty:
         regular_mask = ~df[bin_col_name].str.contains('Special|Missing', regex=True, na=False)
         regular_indices = np.where(regular_mask)[0]
-        
+
         if len(regular_indices) > 0:
-            ax2.plot(regular_indices, regular_bins[metric_column], 
-                     marker='o', color=line_color, linewidth=2, label=f'{dataset_name} {y_axis_label}')
-            
-            # Add value annotations
+            ax2.plot(regular_indices, regular_bins[metric_column],
+                     marker='o', color=line_color, linewidth=2.5, markersize=6,
+                     label=f'{dataset_name} {y_axis_label}')
+
+            # Add value annotations with background
             for idx, val in zip(regular_indices, regular_bins[metric_column]):
-                ax2.annotate(f'{val:.2f}', 
-                             xy=(idx, val), 
-                             xytext=(0, 5),
+                ax2.annotate(f'{val:.2f}',
+                             xy=(idx, val),
+                             xytext=(0, 8),
                              textcoords='offset points',
-                             ha='center', 
-                             fontsize=7)
-    
-    # Plot Special bin point (if exists)
+                             ha='center',
+                             fontsize=8, fontweight='bold', color=line_color,
+                             bbox=label_bbox)
+
+    # Plot Special bin point (if exists and has data)
     if not special_bin.empty:
         special_indices = df[df[bin_col_name].str.contains('Special', regex=False, na=False)].index
         for idx in special_indices:
             special_val = df.loc[idx, metric_column]
-            ax2.plot(idx, special_val,
-                     marker='s', color='red', markersize=8, linestyle='None', 
-                     label='Special' if idx == special_indices[0] else "")
-            ax2.annotate(f'{special_val:.2f}', 
-                         xy=(idx, special_val), 
-                         xytext=(0, 5),
-                         textcoords='offset points',
-                         ha='center', 
-                         fontsize=7)
-    
-    # Plot Missing bin point (if exists)
+            if special_val != 0:
+                ax2.plot(idx, special_val,
+                         marker='s', color=CHART_COLORS['train_special'], markersize=8, linestyle='None',
+                         label='Special' if idx == special_indices[0] else "")
+                ax2.annotate(f'{special_val:.2f}',
+                             xy=(idx, special_val),
+                             xytext=(0, 8),
+                             textcoords='offset points',
+                             ha='center',
+                             fontsize=8, fontweight='bold', color=CHART_COLORS['train_special'],
+                             bbox=label_bbox)
+
+    # Plot Missing bin point (if exists and has data)
     if not missing_bin.empty:
         missing_indices = df[df[bin_col_name].str.contains('Missing', regex=False, na=False)].index
         for idx in missing_indices:
             missing_val = df.loc[idx, metric_column]
-            ax2.plot(idx, missing_val,
-                     marker='D', color='purple', markersize=8, linestyle='None', 
-                     label='Missing' if idx == missing_indices[0] else "")
-            ax2.annotate(f'{missing_val:.2f}', 
-                         xy=(idx, missing_val), 
-                         xytext=(0, 5),
-                         textcoords='offset points',
-                         ha='center', 
-                         fontsize=7)
-    
+            if missing_val != 0:
+                ax2.plot(idx, missing_val,
+                         marker='D', color=CHART_COLORS['train_missing'], markersize=8, linestyle='None',
+                         label='Missing' if idx == missing_indices[0] else "")
+                ax2.annotate(f'{missing_val:.2f}',
+                             xy=(idx, missing_val),
+                             xytext=(0, 8),
+                             textcoords='offset points',
+                             ha='center',
+                             fontsize=8, fontweight='bold', color=CHART_COLORS['train_missing'],
+                             bbox=label_bbox)
+
     # Add horizontal line for Totals if available
     if totals_row is not None:
         total_metric_value = totals_row[metric_column]
-        
+
         # Handle case where value might be a blank string
         if isinstance(total_metric_value, str) and total_metric_value.strip() == '':
             total_metric_value = 0.0
@@ -651,29 +680,28 @@ def plot_single_dataset(
                 total_metric_value = float(total_metric_value)
             except (ValueError, TypeError):
                 total_metric_value = 0.0
-        
-        ax2.axhline(y=total_metric_value, color=line_color, linestyle='--', 
-                   alpha=0.7, label=f'{dataset_name} Total: {total_metric_value:.4f}')
-        
-    
+
+        ax2.axhline(y=total_metric_value, color=line_color, linestyle='--',
+                   alpha=0.7, linewidth=1.5, label=f'{dataset_name} Total: {total_metric_value:.2f}')
+
     # Set y-axis label
-    ax2.set_ylabel(y_axis_label, color=line_color, fontsize=11)
+    ax2.set_ylabel(y_axis_label, color=line_color, fontsize=11, fontweight='bold')
     ax2.tick_params(axis='y', labelcolor=line_color)
-    
+
     # Add legend with unique entries
     handles, labels = ax2.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    ax2.legend(by_label.values(), by_label.keys(), loc='best', fontsize=9)
+    ax2.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=9, framealpha=0.9)
 
 
 def plot_comparison(
-    ax1, train_df, oot_df, bin_col_name, metric_column, 
-    y_axis_label, train_totals_row, total_event_rate_oot, metric,
+    ax1, train_df, oot_df, bin_col_name, metric_column,
+    y_axis_label, train_totals_row, oot_totals_row, metric,
     show_bar_values=False
 ) -> None:
     """
     Helper function to plot a comparison between training and OOT datasets
-    
+
     Parameters:
     -----------
     ax1 : matplotlib axis
@@ -690,8 +718,8 @@ def plot_comparison(
         Label for the y-axis
     train_totals_row : pandas Series
         Totals row from training data
-    total_event_rate_oot : float
-        Overall event rate for OOT data
+    oot_totals_row : pandas Series
+        Totals row from OOT data
     metric : str
         Metric to plot ('event_rate' or 'woe')
     show_bar_values : bool
@@ -700,44 +728,44 @@ def plot_comparison(
     # Ensure bin columns are string type for consistency
     train_df[bin_col_name] = train_df[bin_col_name].astype(str)
     oot_df[bin_col_name] = oot_df[bin_col_name].astype(str)
-    
+
     # Create a combined set of unique bin names, preserving order from train_df first
     bin_names = list(train_df[bin_col_name])
     # Add any bins from OOT that aren't in training (shouldn't happen normally)
     for bin_name in oot_df[bin_col_name]:
         if bin_name not in bin_names:
             bin_names.append(bin_name)
-    
+
     # Create x indices
     x_indices = np.arange(len(bin_names))
-    
+
     # Prepare data for plotting - match bin names between datasets
     train_values = []
     oot_values = []
     train_counts = []
     oot_counts = []
-    
+
     for bin_name in bin_names:
         # Find metric values for each bin in each dataset
         train_row = train_df[train_df[bin_col_name] == bin_name]
         oot_row = oot_df[oot_df[bin_col_name] == bin_name]
-        
+
         # If bin exists in training data, get its value; otherwise NaN
         if not train_row.empty:
             train_values.append(train_row[metric_column].values[0])
-            train_counts.append(train_row['Count (%)'].values[0])  # Convert to percentage
+            train_counts.append(train_row['Count (%)'].values[0])
         else:
             train_values.append(np.nan)
             train_counts.append(0)
-        
+
         # If bin exists in OOT data, get its value; otherwise NaN
         if not oot_row.empty:
             oot_values.append(oot_row[metric_column].values[0])
-            oot_counts.append(oot_row['Count (%)'].values[0])  # Convert to percentage
+            oot_counts.append(oot_row['Count (%)'].values[0])
         else:
             oot_values.append(np.nan)
             oot_counts.append(0)
-    
+
     # Format bin labels
     bin_labels = []
     for bin_name in bin_names:
@@ -748,12 +776,20 @@ def plot_comparison(
             if len(shortened_name) > 15:
                 shortened_name = shortened_name[:12] + "..."
             bin_labels.append(shortened_name)
-    
-    # Plot Count (%) as grouped bars
+
+    # Plot Count (%) as grouped bars with improved colors
     bar_width = 0.35
-    bar1 = ax1.bar(x_indices - bar_width/2, train_counts, bar_width, color='#2A6F97', alpha=0.85, label='Train Count (%)')
-    bar2 = ax1.bar(x_indices + bar_width/2, oot_counts, bar_width, color='#E76F51', alpha=0.85, label='OOT Count (%)')
-    
+    bar1 = ax1.bar(x_indices - bar_width/2, train_counts, bar_width,
+                   color=CHART_COLORS['train_bar'], alpha=0.85,
+                   edgecolor='white', linewidth=0.5, label='Train Count (%)')
+    bar2 = ax1.bar(x_indices + bar_width/2, oot_counts, bar_width,
+                   color=CHART_COLORS['oot_bar'], alpha=0.85,
+                   edgecolor='white', linewidth=0.5, label='OOT Count (%)')
+
+    # Label style with background for readability
+    bar_label_bbox = dict(boxstyle='round,pad=0.15', facecolor='white', edgecolor='none', alpha=0.7)
+    line_label_bbox = dict(boxstyle='round,pad=0.2', facecolor='white', edgecolor='none', alpha=0.85)
+
     # Add value labels on top of bars if requested
     if show_bar_values:
         for i, (b1, b2) in enumerate(zip(bar1, bar2)):
@@ -762,10 +798,11 @@ def plot_comparison(
             if h1 > 0:
                 ax1.text(
                     b1.get_x() + b1.get_width()/2.,
-                    h1 + 0.5,
+                    h1 + 0.3,
                     f'{h1:.1f}%',
                     ha='center', va='bottom',
-                    fontsize=8, fontweight='bold', color='#1A5276'
+                    fontsize=7, fontweight='bold', color=CHART_COLORS['train_bar'],
+                    bbox=bar_label_bbox
                 )
 
             # OOT bar values
@@ -773,140 +810,158 @@ def plot_comparison(
             if h2 > 0:
                 ax1.text(
                     b2.get_x() + b2.get_width()/2.,
-                    h2 + 0.5,
+                    h2 + 0.3,
                     f'{h2:.1f}%',
                     ha='center', va='bottom',
-                    fontsize=8, fontweight='bold', color='#A93226'
+                    fontsize=7, fontweight='bold', color=CHART_COLORS['oot_bar'],
+                    bbox=bar_label_bbox
                 )
-    
+
     ax1.set_xticks(x_indices)
     ax1.set_xticklabels(bin_labels, rotation=45, ha='right', fontsize=9)
-    ax1.set_xlabel('Bins', fontsize=10)
-    ax1.set_ylabel('Count (%)', color='#2A6F97', fontsize=10)
-    ax1.tick_params(axis='y', labelcolor='#2A6F97', labelsize=9)
-    ax1.legend(loc='upper left', fontsize=8)
-    
+    ax1.set_xlabel('Bins', fontsize=10, fontweight='bold')
+    ax1.set_ylabel('Count (%)', color=CHART_COLORS['train_bar'], fontsize=10, fontweight='bold')
+    ax1.tick_params(axis='y', labelcolor=CHART_COLORS['train_bar'], labelsize=9)
+    ax1.legend(loc='upper left', fontsize=8, framealpha=0.9)
+
     # Create second y-axis for Event Rate or WoE
     ax2 = ax1.twinx()
-    
+
     # Identify regular, special, and missing bins
     regular_mask = ~np.array([('Special' in b or 'Missing' in b) for b in bin_names])
     regular_indices = np.where(regular_mask)[0]
     special_indices = [i for i, b in enumerate(bin_names) if 'Special' in b]
     missing_indices = [i for i, b in enumerate(bin_names) if 'Missing' in b]
-    
+
     # Plot lines for regular bins
     if len(regular_indices) > 0:
         # Filter out NaN values for line plots
         valid_train_idx = [i for i in regular_indices if not np.isnan(train_values[i])]
         valid_oot_idx = [i for i in regular_indices if not np.isnan(oot_values[i])]
-        
+
         if valid_train_idx:
             # Plot training data line
-            train_line = ax2.plot([i for i in valid_train_idx],
-                                  [train_values[i] for i in valid_train_idx],
-                                  marker='o', color='#1E8449', linewidth=2.5,
-                                  label=f'Train {y_axis_label}')
+            ax2.plot([i for i in valid_train_idx],
+                     [train_values[i] for i in valid_train_idx],
+                     marker='o', color=CHART_COLORS['train_line'], linewidth=2.5, markersize=6,
+                     label=f'Train {y_axis_label}')
 
+            # Train line labels - positioned ABOVE
             for idx in valid_train_idx:
                 ax2.annotate(f'{train_values[idx]:.2f}',
                              xy=(idx, train_values[idx]),
-                             xytext=(0, 6),
+                             xytext=(0, 10),
                              textcoords='offset points',
                              ha='center',
                              fontsize=8, fontweight='bold',
-                             color='#145A32')
+                             color=CHART_COLORS['train_label'],
+                             bbox=line_label_bbox)
 
         if valid_oot_idx:
-            oot_line = ax2.plot([i for i in valid_oot_idx],
-                                [oot_values[i] for i in valid_oot_idx],
-                                marker='s', color='#6C3483', linewidth=2.5,
-                                label=f'OOT {y_axis_label}')
+            ax2.plot([i for i in valid_oot_idx],
+                     [oot_values[i] for i in valid_oot_idx],
+                     marker='s', color=CHART_COLORS['oot_line'], linewidth=2.5, markersize=6,
+                     label=f'OOT {y_axis_label}')
 
+            # OOT line labels - positioned BELOW
             for idx in valid_oot_idx:
                 ax2.annotate(f'{oot_values[idx]:.2f}',
                              xy=(idx, oot_values[idx]),
-                             xytext=(0, -15),
+                             xytext=(0, -14),
                              textcoords='offset points',
                              ha='center',
                              fontsize=8, fontweight='bold',
-                             color='#512E5F')
-    
-    # Plot Special bin points
+                             color=CHART_COLORS['oot_label'],
+                             bbox=line_label_bbox)
+
+    # Plot Special bin points (only if non-zero)
     for idx in special_indices:
-        if not np.isnan(train_values[idx]):
-            ax2.plot(idx, train_values[idx],
-                     marker='s', color='red', markersize=8, linestyle='None', 
+        train_val = train_values[idx]
+        oot_val = oot_values[idx]
+
+        if not np.isnan(train_val) and train_val != 0:
+            ax2.plot(idx, train_val,
+                     marker='s', color=CHART_COLORS['train_special'], markersize=8, linestyle='None',
                      label='Train Special' if idx == special_indices[0] else "")
-            ax2.annotate(f'{train_values[idx]:.2f}', 
-                         xy=(idx, train_values[idx]), 
-                         xytext=(-10, 5),
+            ax2.annotate(f'{train_val:.2f}',
+                         xy=(idx, train_val),
+                         xytext=(-12, 6),
                          textcoords='offset points',
-                         ha='center', 
-                         fontsize=7,
-                         color='red')
-        
-        if not np.isnan(oot_values[idx]):
-            ax2.plot(idx, oot_values[idx],
-                     marker='s', color='darkred', markersize=8, linestyle='None', 
+                         ha='center',
+                         fontsize=8, fontweight='bold',
+                         color=CHART_COLORS['train_special'],
+                         bbox=line_label_bbox)
+
+        if not np.isnan(oot_val) and oot_val != 0:
+            ax2.plot(idx, oot_val,
+                     marker='s', color=CHART_COLORS['oot_special'], markersize=8, linestyle='None',
                      label='OOT Special' if idx == special_indices[0] else "")
-            ax2.annotate(f'{oot_values[idx]:.2f}', 
-                         xy=(idx, oot_values[idx]), 
-                         xytext=(10, 5),
+            ax2.annotate(f'{oot_val:.2f}',
+                         xy=(idx, oot_val),
+                         xytext=(12, -6),
                          textcoords='offset points',
-                         ha='center', 
-                         fontsize=7,
-                         color='darkred')
-    
-    # Plot Missing bin points
+                         ha='center',
+                         fontsize=8, fontweight='bold',
+                         color=CHART_COLORS['oot_special'],
+                         bbox=line_label_bbox)
+
+    # Plot Missing bin points (only if non-zero)
     for idx in missing_indices:
-        if not np.isnan(train_values[idx]):
-            ax2.plot(idx, train_values[idx],
-                     marker='D', color='purple', markersize=8, linestyle='None', 
+        train_val = train_values[idx]
+        oot_val = oot_values[idx]
+
+        if not np.isnan(train_val) and train_val != 0:
+            ax2.plot(idx, train_val,
+                     marker='D', color=CHART_COLORS['train_missing'], markersize=8, linestyle='None',
                      label='Train Missing' if idx == missing_indices[0] else "")
-            ax2.annotate(f'{train_values[idx]:.2f}', 
-                         xy=(idx, train_values[idx]), 
-                         xytext=(-10, 5),
+            ax2.annotate(f'{train_val:.2f}',
+                         xy=(idx, train_val),
+                         xytext=(-12, 6),
                          textcoords='offset points',
-                         ha='center', 
-                         fontsize=7,
-                         color='purple')
-        
-        if not np.isnan(oot_values[idx]):
-            ax2.plot(idx, oot_values[idx],
-                     marker='D', color='darkmagenta', markersize=8, linestyle='None', 
+                         ha='center',
+                         fontsize=8, fontweight='bold',
+                         color=CHART_COLORS['train_missing'],
+                         bbox=line_label_bbox)
+
+        if not np.isnan(oot_val) and oot_val != 0:
+            ax2.plot(idx, oot_val,
+                     marker='D', color=CHART_COLORS['oot_missing'], markersize=8, linestyle='None',
                      label='OOT Missing' if idx == missing_indices[0] else "")
-            ax2.annotate(f'{oot_values[idx]:.2f}', 
-                         xy=(idx, oot_values[idx]), 
-                         xytext=(10, 5),
+            ax2.annotate(f'{oot_val:.2f}',
+                         xy=(idx, oot_val),
+                         xytext=(12, -6),
                          textcoords='offset points',
-                         ha='center', 
-                         fontsize=7,
-                         color='darkmagenta')
-    
+                         ha='center',
+                         fontsize=8, fontweight='bold',
+                         color=CHART_COLORS['oot_missing'],
+                         bbox=line_label_bbox)
+
     # Add horizontal lines for totals
     if train_totals_row is not None and metric_column in train_totals_row:
         try:
-            train_total_metric = float(train_totals_row[metric_column]) if train_totals_row[metric_column] != '' else 0.0
-            ax2.axhline(y=train_total_metric, color='#1E8449', linestyle='--', 
-                       alpha=0.7, label=f'Train Total: {train_total_metric:.4f}')
+            train_total_val = train_totals_row[metric_column]
+            if train_total_val != '' and not (isinstance(train_total_val, float) and np.isnan(train_total_val)):
+                train_total_metric = float(train_total_val)
+                ax2.axhline(y=train_total_metric, color=CHART_COLORS['train_line'], linestyle='--',
+                           alpha=0.7, linewidth=1.5, label=f'Train Total: {train_total_metric:.2f}')
         except (ValueError, TypeError):
             pass
-    
-    if total_event_rate_oot is not None and metric == 'event_rate':
+
+    if oot_totals_row is not None and metric_column in oot_totals_row:
         try:
-            oot_total_metric = float(total_event_rate_oot)
-            ax2.axhline(y=oot_total_metric, color='#6C3483', linestyle='--', 
-                       alpha=0.7, label=f'OOT Total: {oot_total_metric:.4f}')
+            oot_total_val = oot_totals_row[metric_column]
+            if oot_total_val != '' and not (isinstance(oot_total_val, float) and np.isnan(oot_total_val)):
+                oot_total_metric = float(oot_total_val)
+                ax2.axhline(y=oot_total_metric, color=CHART_COLORS['oot_line'], linestyle='--',
+                           alpha=0.7, linewidth=1.5, label=f'OOT Total: {oot_total_metric:.2f}')
         except (ValueError, TypeError):
             pass
-    
-    
+
     # Set y-axis label and legend
-    ax2.set_ylabel(y_axis_label, color='black', fontsize=11)
-    ax2.tick_params(axis='y', labelcolor='black')
-    
+    ax2.set_ylabel(y_axis_label, color='#2C3E50', fontsize=11, fontweight='bold')
+    ax2.tick_params(axis='y', labelcolor='#2C3E50')
+
     # Add legend with unique entries
     handles, labels = ax2.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    ax2.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=8)
+    ax2.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=8, framealpha=0.9)
