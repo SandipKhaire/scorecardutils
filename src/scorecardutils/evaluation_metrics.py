@@ -74,7 +74,7 @@ def gainTable(data, score, ground_truth, weights=None,
         )
 
     # Calculate lift
-    KS_data = calculate_lift(KS_data, response_name, lift_index)
+    KS_data = calculate_lift(KS_data, response_name)
     
     
     # Add total row
@@ -309,27 +309,30 @@ def calculate_cumulative_metrics(KS_data, response_name, correlation, lift_index
 
 
 
-def calculate_lift(KS_data, response_name, lift_index):
+def calculate_lift(KS_data, response_name):
     """
     Calculate lift metric for the gains table.
-    
+
+    Lift is calculated as: Decile Bad Rate / Overall Bad Rate
+
     Parameters:
     -----------
     KS_data : pandas.DataFrame
         Gains table data
     response_name : list
         Names for positive and negative classes
-    lift_index : int
-        Index for lift calculation
-    
+
     Returns:
     --------
     pandas.DataFrame
         Gains table with lift metric
     """
+    # Calculate overall bad rate
+    overall_bad_rate = KS_data[response_name[1]].sum() / KS_data['Totals'].sum() * 100
+
+    # Lift = Decile Bad Rate / Overall Bad Rate
     KS_data['Lift'] = (
-        KS_data['Cum'+response_name[lift_index]] / 
-        ((KS_data['Totals'].cumsum() / KS_data['Totals'].sum()) * 100)
+        KS_data[response_name[1] + '_Rate'] / overall_bad_rate
     ).apply(lambda x: round(x, 2))
 
     KS_data=KS_data[['Totals',response_name[1],response_name[1]+'_Rate','Cum'+response_name[1],
