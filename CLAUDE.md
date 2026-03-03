@@ -44,9 +44,9 @@ The package lives in `src/scorecardutils/` with four modules, all re-exported fr
 
 ## Key Details
 
-- **Python >= 3.12** required; build system is `hatchling`
+- **Python >= 3.11** required; build system is `hatchling`
 - **optbinning is pinned to 0.20.1** — this is intentional, do not upgrade
 - Tests use pytest with fixtures in `tests/conftest.py` providing `sample_data` and `feature_names`
-- CI runs on GitHub Actions (`.github/workflows/tests.yml`): Ubuntu, Python 3.12, UV-based install
+- CI runs on GitHub Actions (`.github/workflows/tests.yml`): Ubuntu, Python 3.11 & 3.12, UV-based install
 - Notebooks in `notebooks/` demonstrate the full scorecard workflow (data creation, EDA, modeling)
 - Sample datasets in `data/` are large CSV files used by notebooks

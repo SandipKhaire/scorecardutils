@@ -4,7 +4,7 @@
 
 ScoreCardUtils provides end-to-end utilities for credit scorecard development — from SHAP-based feature selection and optimal binning to WoE transformation, bivariate analysis, model evaluation (KS, AUC, Gini), scorecard scaling, and population stability monitoring (CSI/VSI). Built for credit risk analysts, data scientists, and quantitative teams working in banking, lending, and financial services.
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/sandipkhaire/scorecardutils/actions/workflows/tests.yml/badge.svg)](https://github.com/sandipkhaire/scorecardutils/actions)
 
@@ -32,7 +32,7 @@ pip install git+https://github.com/sandipkhaire/scorecardutils.git
 uv pip install git+https://github.com/sandipkhaire/scorecardutils.git
 ```
 
-Requires **Python 3.12** or higher.
+Requires **Python 3.11** or higher.
 
 ---
 
