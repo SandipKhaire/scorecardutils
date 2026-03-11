@@ -520,7 +520,8 @@ def unified_bivariate_analysis(
                     
                     # Adjust column widths
                     for idx, col in enumerate(df_for_excel.columns):
-                        column_width = max(len(str(col)), df_for_excel[col].astype(str).map(len).max())
+                        max_data_length = df_for_excel[col].astype(str).str.len().max()
+                        column_width = max(len(str(col)), max_data_length if pd.notna(max_data_length) else 0)
                         writer.sheets[sheet_name].column_dimensions[chr(65 + idx)].width = column_width + 4
                 except Exception as e:
                     if verbose:
