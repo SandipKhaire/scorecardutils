@@ -121,7 +121,7 @@ def shap_feature_selection(
     
     # If enable_categorical is True, identify categorical columns
     if default_params.get('enable_categorical', False):
-        categorical_columns = X_train.select_dtypes(include=['category', 'object']).columns.tolist()
+        categorical_columns = X_train.select_dtypes(include=['str', 'category']).columns.tolist()
         if categorical_columns and verbose:
             print(f"Detected {len(categorical_columns)} categorical features: {categorical_columns}")
         
